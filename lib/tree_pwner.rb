@@ -1,6 +1,9 @@
+require File.expand_path('../copy_replace_jaerb', __FILE__)
 require File.expand_path('../drive_client', __FILE__)
 
 class TreePwner
+  attr_reader :source_client, :target_client
+
   def initialize
     # for this to work twice the same execution run, the waiting
     # WEBrick server needs to be shutdown, not just stopped.
@@ -25,30 +28,24 @@ class TreePwner
     folder = @source_client.find_folder_by_title folder_title
     raise "Multiple folders <#{folder.length}> with title #{folder_title} found." if folder.is_a? Array
     folders = [folder]
+
+    # pool = CopyReplaceJaerb.pool(args: self)
+
     while folder = folders.shift
-      @source_client.children_in_folder(folder) do |file|
+      puts "Searching #{folder.title}"
+      q = [FileCriteria.is_not_a_folder, FileCriteria.i_own, FileCriteria.not_trashed].join(' and ')
+      @source_client.children_in_folder(folder, q) do |file|
         # puts "#{file.title} => #{file.mimeType}: #{file.ownerNames.join.inspect}"
-        next if file.labels.trashed
-        if file.mimeType == 'application/vnd.google-apps.folder'
-          folders << file
-          next
-        end
-        # if we're not the owner, then don't worry about it
-        next unless file.owners.first.isAuthenticatedUser
-        print "Transferring by copy/remove original: #{file['title']} ... "
-        copy_file_to_target_and_delete_original_in_source(file)
+
+        CopyReplaceJaerb.new(self).copy_file_to_target_and_delete_original_in_source(file)
+        # pool.async.copy_file_to_target_and_delete_original_in_source(file)
+      end
+
+      q = [FileCriteria.is_a_folder, FileCriteria.not_trashed].join(' and ')
+      @source_client.children_in_folder(folder, q) do |child_folder|
+        folders << child_folder
       end
     end
     nil
-  end
-
-  def copy_file_to_target_and_delete_original_in_source(origin_file)
-    new_file = @target_client.copy_file(origin_file)
-    if new_file.md5Checksum == origin_file.md5Checksum
-      @source_client.trash_file(origin_file)
-      puts 'done.'
-    else
-      puts 'copied file md5 does not match.'
-    end
   end
 end

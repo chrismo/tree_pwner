@@ -6,6 +6,8 @@ GEM
       addressable (>= 2.3.1)
       extlib (>= 0.9.15)
       multi_json (>= 1.0.0)
+    celluloid (0.15.2)
+      timers (~> 1.1.0)
     coderay (1.1.0)
     extlib (0.9.16)
     faraday (0.9.0)
@@ -39,12 +41,14 @@ GEM
       jwt (>= 0.1.5)
       multi_json (>= 1.0.0)
     slop (3.5.0)
+    timers (1.1.0)
     uuidtools (2.1.4)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
+  celluloid
   google-api-client
   launchy
   pry

@@ -2,6 +2,8 @@ require 'google/api_client'
 require 'google/api_client/auth/file_storage'
 require 'google/api_client/auth/installed_app'
 
+require File.expand_path('../file_criteria', __FILE__)
+
 class DriveClient
   # http://www.krautcomputing.com/blog/2013/12/17/how-to-access-your-google-drive-files-with-ruby/
   def initialize(name)
@@ -15,10 +17,17 @@ class DriveClient
       installed_app_flow = ::Google::APIClient::InstalledAppFlow.new(
         client_id: '537356659579-njv3rplj01rknispaercptnk5n91n2go.apps.googleusercontent.com',
         client_secret: 'jdV-7Kde8Yd00MB4qPiv9MGP',
-        scope: 'https://www.googleapis.com/auth/drive'
+        scope: 'openid email https://www.googleapis.com/auth/drive'
       )
       installed_app_flow.authorize(credentials_storage)
     end
+
+    if @client.authorization.refresh_token &&
+      @client.authorization.expired?
+      puts 'refreshing access token'
+      @client.authorization.fetch_access_token!
+    end
+
     @drive = @client.discovered_api('drive', 'v2')
   end
 
@@ -70,17 +79,18 @@ class DriveClient
   end
 
   def find_folder_by_title(title)
-    results = search("title = \"#{title}\" and mimeType = \"application/vnd.google-apps.folder\"")
+    results = search("title = \"#{title}\" and #{FileCriteria.is_a_folder}")
     results.length == 1 ? results.first : results
   end
 
-  def children_in_folder(folder)
+  def children_in_folder(folder, q=nil)
     page_token = nil
     begin
       parameters = {'folderId' => folder.id}
       if page_token.to_s != ''
         parameters['pageToken'] = page_token
       end
+      parameters.merge!('q' => q) if q
       result = @client.execute(
         :api_method => @drive.children.list,
         :parameters => parameters)
@@ -95,8 +105,7 @@ class DriveClient
         end
         page_token = children.next_page_token
       else
-        puts "An error occurred: #{result.data['error']['message']}"
-        page_token = nil
+        raise ["An error occurred: #{result.data['error']['message']}", result.data.to_hash].join("\n")
       end
     end while page_token.to_s != ''
   end
@@ -132,10 +141,19 @@ class DriveClient
         maxResults: max
       }
     )
-    result.data['items']
+    if result.status == 200
+      result.data['items']
+    else
+      raise [result.data['error']['message'], result.data.to_hash].join("\n")
+    end
   end
 
   def get_all_folders
-    search 'mimeType = "application/vnd.google-apps.folder"'
+    search FileCriteria.is_a_folder
+  end
+
+  def about
+    # email not in here, even with it in scope. needs user endpoint somewhere ...
+    @client.execute(api_method: @drive.about.get).data
   end
 end
