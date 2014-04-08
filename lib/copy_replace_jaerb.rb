@@ -11,7 +11,7 @@ class CopyReplaceJaerb
 
   def retry_options
     {:max_tries => 10,
-     :base_sleep_seconds => 0.5,
+     :base_sleep_seconds => 2.0,
      :max_sleep_seconds => 30.0,
      :rescue => [RateLimitExceeded]}
   end

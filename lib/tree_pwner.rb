@@ -11,7 +11,9 @@ class TreePwner
     # google-api-client-0.7.1/lib/google/api_client/auth/installed_app.rb
     #
     # inside server.mount_proc '/'
+    puts 'Connecting to Google Drive source ...'
     @source_client = DriveClient.connect('source')
+    puts 'Connecting to Google Drive target ...'
     @target_client = DriveClient.connect('target')
 
     log_fn = File.expand_path('../../tmp/tree-pwner.log', __FILE__)
