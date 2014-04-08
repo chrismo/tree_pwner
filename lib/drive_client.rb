@@ -72,7 +72,7 @@ class DriveClient
     if message =~ /Rate Limit Exceeded/
       raise RateLimitExceeded, result.data, caller
     else
-      puts "An error occurred #{description}: #{message}"
+      raise "An error occurred #{description}: #{message}"
     end
   end
 

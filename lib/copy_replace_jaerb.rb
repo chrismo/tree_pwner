@@ -3,6 +3,7 @@ require 'retries'
 
 class CopyReplaceJaerb
   include Celluloid
+  include Celluloid::Logger
 
   def initialize(pwner)
     @pwner = pwner
@@ -27,9 +28,10 @@ class CopyReplaceJaerb
       puts "Re-try #{attempt_number}" if attempt_number > 1
       if new_file.md5Checksum == origin_file.md5Checksum
         @pwner.source_client.trash_file(origin_file)
+        info "#{origin_file.title} done."
         puts "#{origin_file.title} done."
       else
-        puts "#{origin_file.title} copied file md5 does not match."
+        raise "#{origin_file.title} copied file md5 does not match."
       end
     end
   end

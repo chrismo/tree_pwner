@@ -13,6 +13,9 @@ class TreePwner
     # inside server.mount_proc '/'
     @source_client = DriveClient.connect('source')
     @target_client = DriveClient.connect('target')
+
+    log_fn = File.expand_path('../../tmp/tree-pwner.log', __FILE__)
+    Celluloid.logger = ::Logger.new(log_fn)
   end
 
   # In the Web UI, Google Drive _will_ allow a non-owning editor
