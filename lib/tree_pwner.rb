@@ -11,8 +11,8 @@ class TreePwner
     # google-api-client-0.7.1/lib/google/api_client/auth/installed_app.rb
     #
     # inside server.mount_proc '/'
-    @source_client = DriveClient.new('source')
-    @target_client = DriveClient.new('target')
+    @source_client = DriveClient.connect('source')
+    @target_client = DriveClient.connect('target')
   end
 
   # In the Web UI, Google Drive _will_ allow a non-owning editor
@@ -29,16 +29,13 @@ class TreePwner
     raise "Multiple folders <#{folder.length}> with title #{folder_title} found." if folder.is_a? Array
     folders = [folder]
 
-    # pool = CopyReplaceJaerb.pool(args: self)
+    pool = CopyReplaceJaerb.pool(args: self)
 
     while folder = folders.shift
       puts "Searching #{folder.title}"
       q = [FileCriteria.is_not_a_folder, FileCriteria.i_own, FileCriteria.not_trashed].join(' and ')
       @source_client.children_in_folder(folder, q) do |file|
-        # puts "#{file.title} => #{file.mimeType}: #{file.ownerNames.join.inspect}"
-
-        CopyReplaceJaerb.new(self).copy_file_to_target_and_delete_original_in_source(file)
-        # pool.async.copy_file_to_target_and_delete_original_in_source(file)
+        pool.async.copy_file_to_target_and_delete_original_in_source(file)
       end
 
       q = [FileCriteria.is_a_folder, FileCriteria.not_trashed].join(' and ')

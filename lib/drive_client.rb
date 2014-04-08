@@ -4,16 +4,19 @@ require 'google/api_client/auth/installed_app'
 
 require File.expand_path('../file_criteria', __FILE__)
 
+class RateLimitExceeded < RuntimeError
+end
+
 class DriveClient
   # http://www.krautcomputing.com/blog/2013/12/17/how-to-access-your-google-drive-files-with-ruby/
-  def initialize(name)
+  def self.connect(name)
     credentials_file = File.expand_path("../../tmp/google_api_credentials.#{name}.json", __FILE__)
     credentials_storage = ::Google::APIClient::FileStorage.new(credentials_file)
-    @client = ::Google::APIClient.new(
+    client = ::Google::APIClient.new(
       application_name: 'TreePwner',
       application_version: '1.0.0'
     )
-    @client.authorization = credentials_storage.authorization || begin
+    client.authorization = credentials_storage.authorization || begin
       installed_app_flow = ::Google::APIClient::InstalledAppFlow.new(
         client_id: '537356659579-njv3rplj01rknispaercptnk5n91n2go.apps.googleusercontent.com',
         client_secret: 'jdV-7Kde8Yd00MB4qPiv9MGP',
@@ -22,13 +25,18 @@ class DriveClient
       installed_app_flow.authorize(credentials_storage)
     end
 
-    if @client.authorization.refresh_token &&
-      @client.authorization.expired?
+    if client.authorization.refresh_token &&
+      client.authorization.expired?
       puts 'refreshing access token'
-      @client.authorization.fetch_access_token!
+      client.authorization.fetch_access_token!
     end
 
-    @drive = @client.discovered_api('drive', 'v2')
+    self.new(client, client.discovered_api('drive', 'v2'))
+  end
+  
+  def initialize(client, drive)
+    @client = client
+    @drive = drive
   end
 
   def copy_file(origin_file)
@@ -44,7 +52,7 @@ class DriveClient
     if result.status == 200
       return result.data
     else
-      puts "An error occurred making copies: #{result.data['error']['message']}"
+      handle_error("copying file #{origin_file.title}", result)
     end
   end
 
@@ -55,7 +63,16 @@ class DriveClient
     if result.status == 200
       result.data
     else
-      puts "An error occurred trashing original: #{result.data['error']['message']}"
+      handle_error("trashing file #{file.title}", result)
+    end
+  end
+
+  def handle_error(description, result)
+    message = result.data['error']['message']
+    if message =~ /Rate Limit Exceeded/
+      raise RateLimitExceeded, result.data, caller
+    else
+      puts "An error occurred #{description}: #{message}"
     end
   end
 
