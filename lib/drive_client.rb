@@ -33,7 +33,7 @@ class DriveClient
 
     self.new(client, client.discovered_api('drive', 'v2'))
   end
-  
+
   def initialize(client, drive)
     @client = client
     @drive = drive
@@ -68,11 +68,17 @@ class DriveClient
   end
 
   def handle_error(description, result)
-    message = result.data['error']['message']
-    if message =~ /Rate Limit Exceeded/
-      raise RateLimitExceeded, result.data, caller
+    if result.data['error'] && result.data['error']['message']
+      message = result.data['error']['message']
+      if message =~ /Rate Limit Exceeded/
+        raise RateLimitExceeded, result.data, caller
+      else
+        raise "An error occurred #{description}: #{message}"
+      end
     else
-      raise "An error occurred #{description}: #{message}"
+      # some calling methods check for status 200 only, but other 2xx can be
+      # returned with no ['error']['message']
+      raise ["An unexpected result status occurred <#{result.status}>", result.data.to_hash].join("\n")
     end
   end
 
@@ -122,7 +128,7 @@ class DriveClient
         end
         page_token = children.next_page_token
       else
-        raise ["An error occurred: #{result.data['error']['message']}", result.data.to_hash].join("\n")
+        handle_error("children in folder #{folder.title}", result)
       end
     end while page_token.to_s != ''
   end

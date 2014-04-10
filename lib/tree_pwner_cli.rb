@@ -28,8 +28,20 @@ class TreePwnerCli
   end
 
   def scan(folder_name)
-    @tp.copy_and_replace_all_files_owned_by_source folder_name
+    unless changed_mind_after_detected_trashed_files
+      @tp.copy_and_replace_all_files_owned_by_source folder_name
+    end
     self
+  end
+
+  def changed_mind_after_detected_trashed_files
+    trashed = @tp.source_client.search(FileCriteria.trashed)
+    if trashed.length > 0
+      print "#{trashed.length} files in Trash. Continue? (y/N): "
+      !(gets.chomp =~ /y/)
+    else
+      false
+    end
   end
 
   private
