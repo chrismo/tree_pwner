@@ -179,4 +179,8 @@ class DriveClient
     # email not in here, even with it in scope. needs user endpoint somewhere ...
     @client.execute(api_method: @drive.about.get).data
   end
+
+  def email_address
+    about.instance_variable_get('@data')['user']['emailAddress']
+  end
 end

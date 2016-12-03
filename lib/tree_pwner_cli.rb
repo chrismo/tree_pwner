@@ -10,6 +10,8 @@ class TreePwnerCli
   end
 
   def pretty_inspect
+    puts "Source: #{@tp.source_client.email_address}"
+    puts "Target: #{@tp.target_client.email_address}"
     puts @current_root
     @sub_folders.sort { |a, b| a.title <=> b.title }.each { |f| puts "+- #{f.title}" }
     ['hello!', "Type help if you're lost"].sample
@@ -37,7 +39,7 @@ class TreePwnerCli
   def changed_mind_after_detected_trashed_files
     trashed = @tp.source_client.search(FileCriteria.trashed)
     if trashed.length > 0
-      print "#{trashed.length} files in Trash. Continue? (y/N): "
+      print "#{trashed.length} files in #{@tp.source_client.email_address} Trash. Continue? (y/N): "
       !(gets.chomp =~ /y/)
     else
       false
