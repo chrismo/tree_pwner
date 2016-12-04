@@ -1,42 +1,45 @@
-require 'google/api_client'
-require 'google/api_client/auth/file_storage'
-require 'google/api_client/auth/installed_app'
+require 'google/apis/drive_v3'
+require 'googleauth'
+require 'googleauth/stores/file_token_store'
 
-require File.expand_path('../file_criteria', __FILE__)
+require_relative 'file_criteria'
 
 class RateLimitExceeded < RuntimeError
 end
 
 class DriveClient
-  # http://www.krautcomputing.com/blog/2013/12/17/how-to-access-your-google-drive-files-with-ruby/
-  def self.connect(name)
-    credentials_file = File.expand_path("../../tmp/google_api_credentials.#{name}.json", __FILE__)
-    credentials_storage = ::Google::APIClient::FileStorage.new(credentials_file)
-    client = ::Google::APIClient.new(
-      application_name: 'TreePwner',
-      application_version: '1.0.0'
-    )
-    client.authorization = credentials_storage.authorization || begin
-      installed_app_flow = ::Google::APIClient::InstalledAppFlow.new(
-        client_id: '537356659579-njv3rplj01rknispaercptnk5n91n2go.apps.googleusercontent.com',
-        client_secret: 'jdV-7Kde8Yd00MB4qPiv9MGP',
-        scope: 'openid email https://www.googleapis.com/auth/drive'
-      )
-      installed_app_flow.authorize(credentials_storage)
+  OOB_URI = 'urn:ietf:wg:oauth:2.0:oob'
+
+  def self.connect(name, user_id)
+    tmp_dir = File.expand_path('../tmp', __dir__)
+    credentials_file = File.join(tmp_dir, "client_secret.#{user_id}.json")
+    client_id = ::Google::Auth::ClientId.from_file(credentials_file)
+    token_store = Google::Auth::Stores::FileTokenStore.new(:file => File.join(tmp_dir, 'tokens.yaml'))
+    scope = Google::Apis::DriveV3::AUTH_DRIVE
+    authorizer = Google::Auth::UserAuthorizer.new(client_id, scope, token_store)
+
+    credentials = authorizer.get_credentials(user_id)
+    if credentials.nil?
+      url = authorizer.get_authorization_url(base_url: OOB_URI)
+      puts "Open #{url} in your browser and enter the resulting code:"
+      code = gets
+      credentials = authorizer.get_and_store_credentials_from_code(
+        user_id: user_id, code: code, base_url: OOB_URI)
     end
 
-    if client.authorization.refresh_token &&
-      client.authorization.expired?
-      puts 'refreshing access token'
-      client.authorization.fetch_access_token!
-    end
+    drive = Google::Apis::DriveV3::DriveService.new
+    drive.client_options.application_name = 'TreePwner'
+    drive.authorization = credentials
 
-    self.new(client, client.discovered_api('drive', 'v2'))
+    self.new(drive, user_id)
   end
 
-  def initialize(client, drive)
-    @client = client
+  attr_reader :root
+
+  def initialize(drive, user_id)
     @drive = drive
+    @root = @drive.get_file('root')
+    @user_id = user_id
   end
 
   def copy_file(origin_file)
@@ -106,31 +109,17 @@ class DriveClient
     results.length == 1 ? results.first : results
   end
 
-  def children_in_folder(folder, q=nil)
+  def children_in_folder(folder, q=DriveQuery.new)
     page_token = nil
+    q.and("'#{folder.id}' in parents")
     begin
-      parameters = {'folderId' => folder.id}
-      if page_token.to_s != ''
-        parameters['pageToken'] = page_token
-      end
-      parameters.merge!('q' => q) if q
-      result = @client.execute(
-        :api_method => @drive.children.list,
-        :parameters => parameters)
-      if result.status == 200
-        children = result.data
-        children.items.each do |child_ref|
-          result = @client.execute(
-            :api_method => @drive.files.get,
-            :parameters => {'fileId' => child_ref.id})
-          child = result.data
-          yield child
-        end
-        page_token = children.next_page_token
-      else
-        handle_error("children in folder #{folder.title}", result)
-      end
-    end while page_token.to_s != ''
+      result = @drive.list_files(
+        q: q.to_s, page_token: page_token,
+        fields: 'files(id,name),next_page_token'
+      )
+      result.files.each { |file| yield file }
+      page_token = result.next_page_token
+    end while page_token
   end
 
   def remove_root_parent_from_all_folders
@@ -157,30 +146,31 @@ class DriveClient
   end
 
   def search(q, max=1000)
-    result = @client.execute(
-      api_method: @drive.files.list,
-      parameters: {
-        q: q,
-        maxResults: max
-      }
-    )
-    if result.status == 200
-      result.data['items']
-    else
-      raise [result.data['error']['message'], result.data.to_hash].join("\n")
-    end
+    result = @drive.list_files(q: q.to_s, fields: 'files(id,name),next_page_token')
+    result.files
   end
 
   def get_all_folders
     search FileCriteria.is_a_folder
   end
 
-  def about
-    # email not in here, even with it in scope. needs user endpoint somewhere ...
-    @client.execute(api_method: @drive.about.get).data
+  def email_address
+    @user_id
+  end
+end
+
+class DriveQuery
+  def initialize(q='')
+    @query = q
+    self
   end
 
-  def email_address
-    about.instance_variable_get('@data')['user']['emailAddress']
+  def and(q)
+    @query.empty? ? @query = q : @query << " and #{q}"
+    self
+  end
+
+  def to_s
+    @query
   end
 end

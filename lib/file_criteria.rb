@@ -1,7 +1,7 @@
 # surely some fluent api fun to be had here
 class FileCriteria
   def self.is_a_folder
-    'mimeType = "application/vnd.google-apps.folder"'
+    "mimeType = 'application/vnd.google-apps.folder'"
   end
 
   def self.is_not_a_folder

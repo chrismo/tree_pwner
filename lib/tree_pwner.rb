@@ -1,23 +1,22 @@
-require File.expand_path('../copy_replace_jaerb', __FILE__)
-require File.expand_path('../drive_client', __FILE__)
+require_relative 'copy_replace_jaerb'
+require_relative 'drive_client'
 
 class TreePwner
   attr_reader :source_client, :target_client
 
   def initialize
-    # for this to work twice the same execution run, the waiting
-    # WEBrick server needs to be shutdown, not just stopped.
-    #
-    # google-api-client-0.7.1/lib/google/api_client/auth/installed_app.rb
-    #
-    # inside server.mount_proc '/'
-    puts 'Connecting to Google Drive source ...'
-    @source_client = DriveClient.connect('source')
-    puts 'Connecting to Google Drive target ...'
-    @target_client = DriveClient.connect('target')
-
-    log_fn = File.expand_path('../../tmp/tree-pwner.log', __FILE__)
+    log_fn = File.expand_path('../tmp/tree-pwner.log', __dir__)
     Celluloid.logger = ::Logger.new(log_fn)
+  end
+
+  def connect_source(user_id)
+    puts "Connecting to Google Drive source #{user_id}..."
+    @source_client = DriveClient.connect('source', user_id)
+  end
+
+  def connect_target(user_id)
+    puts "Connecting to Google Drive target #{user_id}..."
+    @target_client = DriveClient.connect('target', user_id)
   end
 
   # In the Web UI, Google Drive _will_ allow a non-owning editor

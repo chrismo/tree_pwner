@@ -1,4 +1,4 @@
-require File.expand_path('../../lib/tree_pwner', __FILE__)
+require_relative 'tree_pwner'
 
 class TreePwnerCli
   attr_reader :tp
@@ -6,21 +6,41 @@ class TreePwnerCli
   def initialize(*args)
     super
     @tp = TreePwner.new
-    open('root')
+    # To get these, you have to download a client_secret.json from Dev Tools and
+    # all - see
+    # https://developers.google.com/drive/v3/web/quickstart/ruby#step_1_turn_on_the_api_name
+    @tp.connect_source('the.chrismo@gmail.com')
+    @tp.connect_target('chrismo@clabs.org')
   end
 
   def pretty_inspect
-    puts "Source: #{@tp.source_client.email_address}"
-    puts "Target: #{@tp.target_client.email_address}"
-    puts @current_root
-    @sub_folders.sort { |a, b| a.title <=> b.title }.each { |f| puts "+- #{f.title}" }
+    puts "Source: #{client_email(@tp.source_client)}"
+    puts "Target: #{client_email(@tp.target_client)}"
+    if @current_root && @sub_folders
+      puts @current_root
+      @sub_folders.sort { |a, b| a.name <=> b.name }.each { |f| puts "+- #{f.name}" }
+    end
     ['hello!', "Type help if you're lost"].sample
   end
 
+  def client_email(client)
+    client.nil? ? 'No client connected' : client.email_address
+  end
+
   def help
-    puts 'help               -- Display this help'
-    puts 'open [folder name] -- Show folders in [folder name]. Use "root" name to go back to the top.'
-    puts 'scan [folder name] -- Scan folder name hierarchy for files to transfer ownership of.'
+    puts 'help                   -- Display this help'
+    puts 'connect_source [email] -- Connect source to email account'
+    puts 'connect_target [email] -- Connect target to email account'
+    puts 'open [folder name]     -- Show folders in [folder name]. Use "root" name to go back to the top.'
+    puts 'scan [folder name]     -- Scan folder name hierarchy for files to transfer ownership of.'
+  end
+
+  def connect_source(user_id)
+    @tp.connect_source(user_id)
+  end
+
+  def connect_target(user_id)
+    @tp.connect_target(user_id)
   end
 
   def open(folder_name)
@@ -39,7 +59,7 @@ class TreePwnerCli
   def changed_mind_after_detected_trashed_files
     trashed = @tp.source_client.search(FileCriteria.trashed)
     if trashed.length > 0
-      print "#{trashed.length} files in #{@tp.source_client.email_address} Trash. Continue? (y/N): "
+      print "#{trashed.length} files in #{client_email(@tp.source_client)} Trash. Continue? (y/N): "
       !(gets.chomp =~ /y/)
     else
       false
@@ -50,13 +70,15 @@ class TreePwnerCli
 
   def load_current_root_sub_folders
     if @current_root == 'root' # special alias
-      folder = OpenStruct.new(:id => 'root')
+      folder = @tp.target_client.root
     else
-      folder = @tp.target_client.search(["title = \"#{@current_root}\"", FileCriteria.is_a_folder, FileCriteria.not_trashed].join(' and ')).first
+      q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
+      q.and("name = '#{@current_root}'")
+      folder = @tp.target_client.search(q).first
     end
 
     @sub_folders = []
-    q = [FileCriteria.is_a_folder, FileCriteria.not_trashed].join(' and ')
+    q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
     @tp.target_client.children_in_folder(folder, q) do |child_folder|
       @sub_folders << child_folder
     end
