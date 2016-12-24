@@ -44,23 +44,8 @@ class DriveClient
   end
 
   def copy_file(origin_file)
-    copied_file = @drive.files.copy.request_schema.new(
-      {
-        'title' => origin_file.title,
-        'modifiedDate' => origin_file.to_hash['modifiedDate']
-      })
-
-    @drive.copy_file(origin_file.id)
-
-    result = @client.execute(
-      :api_method => @drive.files.copy,
-      :body_object => copied_file,
-      :parameters => {'fileId' => origin_file.id})
-    if result.status == 200
-      return result.data
-    else
-      handle_error("copying file #{origin_file.title}", result)
-    end
+    file = Google::Apis::DriveV3::File.new(modified_time: origin_file.modified_time.rfc3339)
+    @drive.copy_file(origin_file.id, file)
   end
 
   def trash_file(file)
@@ -132,7 +117,8 @@ class DriveClient
   end
 
   def find_folder_by_title(title)
-    results = search("name = \"#{title}\" and #{FileCriteria.is_a_folder}")
+    q = DriveQuery.new("name = \"#{title}\"").and(FileCriteria.is_a_folder)
+    results = search(q)
     results.length == 1 ? results.first : results
   end
 
@@ -177,7 +163,7 @@ class DriveClient
   end
 
   def default_fields
-    'files(id,name,permissions,size,mimeType,shared,ownedByMe),next_page_token'
+    'files(id,name,permissions,size,mimeType,shared,ownedByMe,modifiedTime),next_page_token'
   end
 
   def get_all_folders
