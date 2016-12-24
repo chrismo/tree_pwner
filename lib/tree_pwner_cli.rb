@@ -49,6 +49,26 @@ class TreePwnerCli
     self
   end
 
+  def open_source_root
+    @current_root = 'root'
+    load_current_root_sub_folders(@tp.source_client)
+  end
+
+  def open_target_root
+    @current_root = 'root'
+    load_current_root_sub_folders(@tp.target_client)
+  end
+
+  def source_disk_usage(folder_name=@current_root)
+    folder = get_folder_obj(folder_name, @tp.source_client)
+    @tp.source_client.disk_usage(folder)
+  end
+
+  def target_disk_usage(folder_name=@current_root)
+    folder = get_folder_obj(folder_name, @tp.target_client)
+    @tp.target_client.disk_usage(folder)
+  end
+
   def scan(folder_name)
     unless changed_mind_after_detected_trashed_files
       @tp.copy_and_replace_all_files_owned_by_source folder_name
@@ -68,20 +88,24 @@ class TreePwnerCli
 
   private
 
-  def load_current_root_sub_folders
-    if @current_root == 'root' # special alias
-      folder = @tp.target_client.root
-    else
-      q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
-      q.and("name = '#{@current_root}'")
-      folder = @tp.target_client.search(q).first
-    end
+  def load_current_root_sub_folders(client=@tp.target_client)
+    folder = get_folder_obj(@current_root, client)
 
     @sub_folders = []
     q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
-    @tp.target_client.children_in_folder(folder, q) do |child_folder|
+    client.children_in_folder(folder, q) do |child_folder|
       @sub_folders << child_folder
     end
   end
 
+  def get_folder_obj(folder_name, client=@tp.target_client)
+    if folder_name == 'root' # special alias
+      folder = client.root
+    else
+      q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
+      q.and("name = '#{folder_name}'")
+      folder = client.search(q).first
+    end
+    folder
+  end
 end

@@ -2,6 +2,7 @@ require 'google/apis/drive_v3'
 require 'googleauth'
 require 'googleauth/stores/file_token_store'
 
+require_relative 'disk_usage'
 require_relative 'file_criteria'
 
 class RateLimitExceeded < RuntimeError
@@ -48,6 +49,9 @@ class DriveClient
         'title' => origin_file.title,
         'modifiedDate' => origin_file.to_hash['modifiedDate']
       })
+
+    @drive.copy_file(origin_file.id)
+
     result = @client.execute(
       :api_method => @drive.files.copy,
       :body_object => copied_file,
@@ -85,8 +89,31 @@ class DriveClient
     end
   end
 
+  # This errors when trying it between domains:
+  # - invalidSharingRequest: Bad Request. User message: "ACL change not allowed"
+  #
+  # This errors when trying it within the same domain, somesuch user didn't have rights
+  # to do it - which makes no sense to me. But, my guess is this feature is only
+  # supported for transfer within domain users, and some indications on the web
+  # agree with that. Sad face.
+  def transfer_ownership_to(file, email)
+    recipient_permission = file.permissions.detect { |p| p.email_address == email }
+
+    # code isn't designed to ADD a permission for this new user.
+    raise "Cannot find <#{email}> in current users on file" unless recipient_permission
+
+    # This next line doesn't work - "The resource body includes fields which are not directly writable"
+    # recipient_permission.role = 'owner'
+    # So - have to create a new permission instance and just set the one field.
+    new_perm = Google::Apis::DriveV3::Permission.new(id: recipient_permission.id,
+                                                     role: 'owner')
+
+    @drive.update_permission(file.id, recipient_permission.id, new_perm, transfer_ownership: true)
+  end
+
   # limited to folders and Google Docs - excludes uploaded files
   def give_file_ownership_to_email(file_id, email)
+    raise 'not v3 compatible'
     hash = {
       'value' => email,
       'type' => 'user',
@@ -105,17 +132,16 @@ class DriveClient
   end
 
   def find_folder_by_title(title)
-    results = search("title = \"#{title}\" and #{FileCriteria.is_a_folder}")
+    results = search("name = \"#{title}\" and #{FileCriteria.is_a_folder}")
     results.length == 1 ? results.first : results
   end
 
   def children_in_folder(folder, q=DriveQuery.new)
     page_token = nil
-    q.and("'#{folder.id}' in parents")
+    q.and("'#{folder.id}' in parents").and(FileCriteria.not_trashed)
     begin
       result = @drive.list_files(
-        q: q.to_s, page_token: page_token,
-        fields: 'files(id,name),next_page_token'
+        q: q.to_s, page_token: page_token, fields: default_fields
       )
       result.files.each { |file| yield file }
       page_token = result.next_page_token
@@ -145,9 +171,13 @@ class DriveClient
     end
   end
 
-  def search(q, max=1000)
-    result = @drive.list_files(q: q.to_s, fields: 'files(id,name),next_page_token')
+  def search(q)
+    result = @drive.list_files(q: q.to_s, fields: default_fields)
     result.files
+  end
+
+  def default_fields
+    'files(id,name,permissions,size,mimeType,shared,ownedByMe),next_page_token'
   end
 
   def get_all_folders
@@ -157,6 +187,25 @@ class DriveClient
   def email_address
     @user_id
   end
+
+  def disk_usage(folder)
+    FolderData.new(self, folder).tap { |f| f.calculate_size }
+  end
+
+  private
+
+  # from http://codereview.stackexchange.com/questions/9107/printing-human-readable-number-of-bytes
+  def as_size(s)
+    prefix = %W(TiB GiB MiB KiB B)
+    s = s.to_f
+    i = prefix.length - 1
+    while s > 512 && i > 0
+      s /= 1024
+      i -= 1
+    end
+    ((s > 9 || s.modulo(1) < 0.1 ? '%d' : '%.1f') % s) + ' ' + prefix[i]
+  end
+
 end
 
 class DriveQuery

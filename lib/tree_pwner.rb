@@ -29,6 +29,7 @@ class TreePwner
   # source user, so it will be allowed - and also appear in the
   # source user's Trash folder, should we need to recover anything.
   def copy_and_replace_all_files_owned_by_source(folder_title)
+    raise 'not v3 compatible, may be a workaround not needed anymore'
     folder = @source_client.find_folder_by_title folder_title
     raise "Multiple folders <#{folder.length}> with title #{folder_title} found." if folder.is_a? Array
     folders = [folder]
@@ -42,11 +43,18 @@ class TreePwner
         pool.async.copy_file_to_target_and_delete_original_in_source(file)
       end
 
+
       q = [FileCriteria.is_a_folder, FileCriteria.not_trashed].join(' and ')
       @source_client.children_in_folder(folder, q) do |child_folder|
         folders << child_folder
       end
     end
     nil
+  end
+
+  # A Google::Apis::DriveV3::File instance with permissions included
+  def transfer_ownership_to_target(file)
+    @source_client.transfer_ownership_to(file, @target_client.email_address)
+    @drive.update_permission(file.id, file.permissions)
   end
 end
