@@ -43,20 +43,15 @@ class DriveClient
     @user_id = user_id
   end
 
-  def copy_file(origin_file)
-    file = Google::Apis::DriveV3::File.new(modified_time: origin_file.modified_time.rfc3339)
-    @drive.copy_file(origin_file.id, file)
+  def copy_file(src_file)
+    file = Google::Apis::DriveV3::File.new(modified_time: src_file.modified_time.rfc3339)
+    @drive.copy_file(src_file.id, file)
   end
 
   def trash_file(file)
-    result = @client.execute(
-      :api_method => @drive.files.trash,
-      :parameters => {'fileId' => file.id})
-    if result.status == 200
-      result.data
-    else
-      handle_error("trashing file #{file.title}", result)
-    end
+    # @drive.delete_file(file.id) <- permanent delete
+    params = Google::Apis::DriveV3::File.new(trashed: true)
+    @drive.update_file(file.id, params)
   end
 
   def handle_error(description, result)
