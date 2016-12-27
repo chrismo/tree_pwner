@@ -118,15 +118,20 @@ class DriveClient
   end
 
   def children_in_folder(folder, q=DriveQuery.new)
+    children = []
     page_token = nil
     q.and("'#{folder.id}' in parents").and(FileCriteria.not_trashed)
     begin
       result = @drive.list_files(
         q: q.to_s, page_token: page_token, fields: default_fields
       )
-      result.files.each { |file| yield file }
+      result.files.each do |file|
+        yield file if block_given?
+        children << file
+      end
       page_token = result.next_page_token
     end while page_token
+    children
   end
 
   def remove_root_parent_from_all_folders

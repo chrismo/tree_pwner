@@ -36,7 +36,7 @@ class TreePwner
     pool = CopyReplaceJaerb.pool(args: self)
 
     while folder = folders.shift
-      puts "Searching #{folder.title}"
+      puts "Searching #{folder.name}"
       q = DriveQuery.new(FileCriteria.is_not_a_folder).
         and(FileCriteria.i_own)
       @source_client.children_in_folder(folder, q) do |file|

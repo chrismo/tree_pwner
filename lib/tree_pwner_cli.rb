@@ -49,6 +49,12 @@ class TreePwnerCli
     self
   end
 
+  def open_source(folder_name)
+    @current_root = folder_name
+    load_current_root_sub_folders(@tp.source_client)
+    self
+  end
+
   def open_source_root
     @current_root = 'root'
     load_current_root_sub_folders(@tp.source_client)

@@ -28,10 +28,10 @@ class CopyReplaceJaerb
       puts "Re-try #{attempt_number}" if attempt_number > 1
       if new_file.md5_checksum == origin_file.md5_checksum
         @pwner.source_client.trash_file(origin_file)
-        info "#{origin_file.title} done."
-        puts "#{origin_file.title} done."
+        info "#{origin_file.name} done."
+        puts "#{origin_file.name} done."
       else
-        raise "#{origin_file.title} copied file md5 does not match."
+        raise "#{origin_file.name} copied file md5 does not match."
       end
     end
   end
