@@ -28,9 +28,7 @@ class TreePwner
   # so they will own the new file, and then delete it as the
   # source user, so it will be allowed - and also appear in the
   # source user's Trash folder, should we need to recover anything.
-  def copy_and_replace_all_files_owned_by_source(folder_title)
-    folder = @source_client.find_folder_by_title folder_title
-    raise "Multiple folders <#{folder.length}> with title #{folder_title} found." if folder.is_a? Array
+  def copy_and_replace_all_files_owned_by_source(folder)
     folders = [folder]
 
     pool = CopyReplaceJaerb.pool(args: self)

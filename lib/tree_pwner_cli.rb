@@ -66,18 +66,18 @@ class TreePwnerCli
   end
 
   def source_disk_usage(folder_name=@current_root)
-    folder = get_folder_obj(folder_name, @tp.source_client)
-    @tp.source_client.disk_usage(folder)
+    # folder = get_folder_obj(folder_name, @tp.source_client)
+    @tp.source_client.disk_usage(@current_folder)
   end
 
   def target_disk_usage(folder_name=@current_root)
-    folder = get_folder_obj(folder_name, @tp.target_client)
-    @tp.target_client.disk_usage(folder)
+    # folder = get_folder_obj(folder_name, @tp.target_client)
+    @tp.target_client.disk_usage(@current_folder)
   end
 
-  def scan(folder_name)
+  def make_target_owner_of_current_folder_files
     unless changed_mind_after_detected_trashed_files
-      @tp.copy_and_replace_all_files_owned_by_source folder_name
+      @tp.copy_and_replace_all_files_owned_by_source @current_folder
     end
     self
   end
@@ -95,23 +95,30 @@ class TreePwnerCli
   private
 
   def load_current_root_sub_folders(client=@tp.target_client)
-    folder = get_folder_obj(@current_root, client)
-
     @sub_folders = []
     q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
-    client.children_in_folder(folder, q) do |child_folder|
+    client.children_in_folder(@current_folder = get_folder_obj(@current_root, client), q) do |child_folder|
       @sub_folders << child_folder
     end
+    @current_root = @current_folder.name
   end
 
   def get_folder_obj(folder_name, client=@tp.target_client)
     if folder_name == 'root' # special alias
-      folder = client.root
+      found = client.root
     else
-      q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
-      q.and("name = '#{folder_name}'")
-      folder = client.search(q).first
+      folders = folder_name.split('/')
+      parents = [nil]
+      folders.each do |f_name|
+        q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
+        q.and("name = '#{f_name}'")
+        parent = parents.shift
+        q.and("'#{parent.id}' in parents") if parent
+        p "searching <#{q.to_s}>"
+        found = client.search(q).first
+        parents << found
+      end
     end
-    folder
+    found
   end
 end
