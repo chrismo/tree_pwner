@@ -11,7 +11,7 @@ end
 class DriveClient
   OOB_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
-  def self.connect(name, user_id)
+  def self.connect(_, user_id)
     tmp_dir = File.expand_path('../tmp', __dir__)
     credentials_file = File.join(tmp_dir, "client_secret.#{user_id}.json")
     client_id = ::Google::Auth::ClientId.from_file(credentials_file)

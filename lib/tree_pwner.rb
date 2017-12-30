@@ -6,6 +6,7 @@ class TreePwner
 
   def initialize
     log_fn = File.expand_path('../tmp/tree-pwner.log', __dir__)
+    FileUtils.makedirs(File.dirname(log_fn))
     Celluloid.logger = ::Logger.new(log_fn)
   end
 

@@ -66,3 +66,21 @@ class FolderData
     ((s > 9 || s.modulo(1) < 0.1 ? '%d' : '%.1f') % s) + ' ' + prefix[i]
   end
 end
+
+## copied this out to experiment with re-designing it so it can handle sorting
+## by size.
+# class FolderData
+#   def output(indent: 0, depth: nil, current_depth: 0)
+#     rock_bottom = (depth == current_depth)
+#     display_size = rock_bottom ? recursive_size : size
+#     return if rock_bottom && display_size.to_i == 0
+#     number, label = as_size(display_size).split(' ')
+#     puts "#{number.rjust(5)} #{label.ljust(5)} #{' ' * indent} #{folder.name}"
+#
+#     unless rock_bottom
+#       @folders.each do |f|
+#         f.dump(indent: indent + 2, depth: depth, current_depth: current_depth + 1)
+#       end
+#     end
+#   end
+# end
