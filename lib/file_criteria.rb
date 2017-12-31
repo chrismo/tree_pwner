@@ -23,4 +23,12 @@ class FileCriteria
   def self.trashed
     'trashed = true'
   end
+
+  def self.has_parent(parent_id)
+    "'#{parent_id}' in parents"
+  end
+
+  def self.name_is(name)
+    "name = '#{name.gsub("'", "\\\\'")}'"
+  end
 end
