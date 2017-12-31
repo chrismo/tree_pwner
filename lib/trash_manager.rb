@@ -1,3 +1,5 @@
+require_relative 'log_factory'
+
 # After doing an ownership transfer, we can verify the copy of the file
 # still exists in the restore folder of the trashed file.
 #
@@ -6,8 +8,7 @@ class TrashManager
   def initialize(source_client, target_client)
     @source_client = source_client
     @target_client = target_client
-    log_fn = File.expand_path('../tmp/tree-pwner-trash.log', __dir__)
-    @logger = ::Logger.new(log_fn, 10)
+    @logger = LogFactory.make_log('tree-pwner-trash')
     diagnostic
   end
 

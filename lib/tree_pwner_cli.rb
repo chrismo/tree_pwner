@@ -11,6 +11,7 @@ class TreePwnerCli
     @tp.connect_target('the.chrismo@gmail.com')
   end
 
+  # Pry 0.9
   def pretty_inspect
     puts "Source: #{client_email(@tp.source_client)}"
     puts "Target: #{client_email(@tp.target_client)}"
@@ -19,6 +20,11 @@ class TreePwnerCli
       @sub_folders.sort { |a, b| a.name <=> b.name }.each { |f| puts "+- #{f.name}" }
     end
     ['hello!', "Type help if you're lost"].sample
+  end
+
+  # Pry 0.10 eventually uses PP, and this is the PP way to provide custom output
+  def pretty_print(pp)
+    pp.text pretty_inspect
   end
 
   def client_email(client)
@@ -85,8 +91,12 @@ class TreePwnerCli
   end
 
   def make_target_owner_of_current_folder_files
-    unless changed_mind_after_detected_trashed_files
-      @tp.copy_and_replace_all_files_owned_by_source @current_folder
+    if @tp.source_and_target_are_same_domain
+      @tp.transfer_ownership_all_files @current_folder
+    else
+      unless changed_mind_after_detected_trashed_files
+        @tp.copy_and_replace_all_files_owned_by_source @current_folder
+      end
     end
     self
   end

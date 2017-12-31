@@ -78,7 +78,7 @@ class DriveClient
     raise "Cannot find <#{email}> in current users on file" unless recipient_permission
 
     # This next line doesn't work - "The resource body includes fields which are not directly writable"
-    # recipient_permission.role = 'owner'
+    # => `recipient_permission.role = 'owner'`
     # So - have to create a new permission instance and just set the one field.
     new_perm = Google::Apis::DriveV3::Permission.new(id: recipient_permission.id,
                                                      role: 'owner')
@@ -199,6 +199,10 @@ class DriveClient
 
   def email_address
     @user_id
+  end
+
+  def email_domain
+    @user_id.sub(/^.*@/, '')
   end
 
   def disk_usage(folder)
