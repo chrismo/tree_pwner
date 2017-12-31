@@ -27,4 +27,8 @@ class FileCriteria
   def self.has_parent(parent_id)
     "'#{parent_id}' in parents"
   end
+
+  def self.name_is(name)
+    "name = '#{name.gsub("'", "\\\\'")}'"
+  end
 end

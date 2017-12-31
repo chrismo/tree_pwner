@@ -29,7 +29,7 @@ class CopyReplaceJaerb
       # We used to check md5_checksum here, but somewhere between the original coding
       # and later code, the md5_checksum was blank on both files! Then the md5_checksum
       # was ensured to be returned in the source file, but it's never in the copied file.
-      # I don't want to take the time here to retrieve it considering I now have code
+      # I don't want to take the time here to re-retrieve it considering I now have code
       # to confirm the file was copied properly when permanently deleting a file from trash.
       @pwner.source_client.trash_file(origin_file)
       log_put("#{origin_file.name} done.")

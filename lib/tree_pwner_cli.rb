@@ -101,7 +101,7 @@ class TreePwnerCli
     end
   end
 
-  def verify_source_trash_found_in_target(safe_perma_delete: false)
+  def cleanup_source_trash_found_in_target(safe_perma_delete: false)
     TrashManager.new(@tp.source_client, @tp.target_client).
       cleanup_trash_with_target_copy(safe_perma_delete: safe_perma_delete)
   end

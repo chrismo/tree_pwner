@@ -106,12 +106,6 @@ class DriveClient
     end
   end
 
-  def find_folder_by_title(title)
-    q = DriveQuery.new("name = \"#{title}\"").and(FileCriteria.is_a_folder)
-    results = search(q)
-    results.length == 1 ? results.first : results
-  end
-
   def children_in_folder(folder, q=DriveQuery.new, &block)
     q.and("'#{folder.id}' in parents").and(FileCriteria.not_trashed)
     files_in_query(q, &block)
@@ -122,7 +116,7 @@ class DriveClient
     page_token = nil
     begin
       result = @drive.list_files(
-        q: q.to_s, page_token: page_token, fields: search_fields
+        q: q.to_s, page_token: page_token, fields: search_fields, order_by: 'name_natural'
       )
       result.files.each do |file|
         yield file if block_given?
@@ -192,7 +186,7 @@ class DriveClient
       parents = [nil]
       folders.each do |f_name|
         q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
-        q.and("name = '#{f_name}'")
+        q.and(FileCriteria.name_is(f_name))
         parent = parents.shift
         q.and(FileCriteria.has_parent(parent.id)) if parent
         p "searching <#{q.to_s}>"

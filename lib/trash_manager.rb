@@ -27,7 +27,7 @@ class TrashManager
       end
       parent_id = trashed.parents.first
       restore_folder = @target_client.get_folder_by_id(parent_id)
-      q = DriveQuery.new(FileCriteria.has_parent(parent_id)).and("name = '#{trashed.name}'")
+      q = DriveQuery.new(FileCriteria.has_parent(parent_id)).and(FileCriteria.name_is(trashed.name))
       found = @target_client.search(q, non_pagination_ack: true)
       if found.empty?
         log_puts("trashed file not found in original folder: <#{trashed.name}>", :error)
