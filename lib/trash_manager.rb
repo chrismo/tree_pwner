@@ -1,11 +1,13 @@
 # After doing an ownership transfer, we can verify the copy of the file
 # still exists in the restore folder of the trashed file.
+#
+# TODO: Celluloid this - with rate protection
 class TrashManager
   def initialize(source_client, target_client)
     @source_client = source_client
     @target_client = target_client
     log_fn = File.expand_path('../tmp/tree-pwner-trash.log', __dir__)
-    @logger = ::Logger.new(log_fn)
+    @logger = ::Logger.new(log_fn, 10)
     diagnostic
   end
 
@@ -30,9 +32,9 @@ class TrashManager
       q = DriveQuery.new(FileCriteria.has_parent(parent_id)).and(FileCriteria.name_is(trashed.name))
       found = @target_client.search(q, non_pagination_ack: true)
       if found.empty?
-        log_puts("trashed file not found in original folder: <#{trashed.name}>", :error)
+        log_puts("Trashed file not found in original folder: <#{trashed.name}> in <#{restore_folder.name}>", :error)
       elsif found.length > 1
-        log_puts("multiple files of name <#{trashed.name}> found in original folder.", :warn)
+        log_puts("Multiple files of name <#{trashed.name}> found in original folder.", :warn)
       end
 
       all_found_match = found.map do |found_file|
