@@ -1,3 +1,4 @@
+# TODO: allow this to make one pass and sort by owner
 class FolderData
   attr_reader :folders, :folder, :size
 

@@ -4,7 +4,7 @@ class TrashManager
   def initialize(source_client, target_client)
     @source_client = source_client
     @target_client = target_client
-    log_fn = File.expand_path('../tmp/tree-pwner-verify.log', __dir__)
+    log_fn = File.expand_path('../tmp/tree-pwner-trash.log', __dir__)
     @logger = ::Logger.new(log_fn)
     diagnostic
   end

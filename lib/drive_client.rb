@@ -235,6 +235,3 @@ class DriveQuery
     @query
   end
 end
-
-# folder = get_folder_by_name_path('Pictures/2005/2005_christmas')
-# trashed_files = files_in_query(DriveQuery.new(FileCriteria.trashed).and(FileCriteria.has_parent(folder.id)))
