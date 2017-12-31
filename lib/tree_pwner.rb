@@ -33,20 +33,36 @@ class TreePwner
     folders = [folder]
 
     pool = CopyReplaceJaerb.pool(args: self)
+    def pool.size
+      @async_proxy.mailbox.size
+    end
 
     while folder = folders.shift
-      puts "Searching #{folder.name}"
+      print "Searching #{folder.name} ... "
       q = DriveQuery.new(FileCriteria.is_not_a_folder).
         and(FileCriteria.i_own)
-      @source_client.children_in_folder(folder, q) do |file|
+
+      children_files = @source_client.children_in_folder(folder, q) do |file|
         pool.async.copy_file_to_target_and_delete_original_in_source(file)
       end
+      print "queued #{children_files.length} files. "
+
+      puts "Total queued: #{pool.size}"
 
       q = DriveQuery.new(FileCriteria.is_a_folder)
       @source_client.children_in_folder(folder, q) do |child_folder|
         folders << child_folder
       end
     end
+
+    # block on this loop while we wait for all of the Celluloid jobs to finish
+    while pool.size > 0
+      puts "Total queued: #{pool.size}"
+      sleep 10
+    end
+
+    puts "All Done!"
+
     nil
   end
 

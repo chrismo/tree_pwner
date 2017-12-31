@@ -5,9 +5,6 @@ require 'googleauth/stores/file_token_store'
 require_relative 'disk_usage'
 require_relative 'file_criteria'
 
-class RateLimitExceeded < RuntimeError
-end
-
 class DriveClient
   OOB_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
@@ -49,24 +46,22 @@ class DriveClient
   end
 
   def trash_file(file)
-    # @drive.delete_file(file.id) <- permanent delete
-    params = Google::Apis::DriveV3::File.new(trashed: true)
+    change_trashed_status(file, trashed: true)
+  end
+
+  def restore_file(file)
+    change_trashed_status(file, trashed: false)
+  end
+
+  def change_trashed_status(file, trashed:)
+    params = Google::Apis::DriveV3::File.new(trashed: trashed)
     @drive.update_file(file.id, params)
   end
 
-  def handle_error(description, result)
-    if result.data['error'] && result.data['error']['message']
-      message = result.data['error']['message']
-      if message =~ /Rate Limit Exceeded/
-        raise RateLimitExceeded, result.data, caller
-      else
-        raise "An error occurred #{description}: #{message}"
-      end
-    else
-      # some calling methods check for status 200 only, but other 2xx can be
-      # returned with no ['error']['message']
-      raise ["An unexpected result status occurred <#{result.status}>", result.data.to_hash].join("\n")
-    end
+  # permanently deletes file only if trashed
+  def permanently_delete_trashed_file(file)
+    raise "File not trashed, will not delete." unless file.trashed
+    @drive.delete_file(file.id)
   end
 
   # This errors when trying it between domains:
@@ -117,21 +112,25 @@ class DriveClient
     results.length == 1 ? results.first : results
   end
 
-  def children_in_folder(folder, q=DriveQuery.new)
-    children = []
-    page_token = nil
+  def children_in_folder(folder, q=DriveQuery.new, &block)
     q.and("'#{folder.id}' in parents").and(FileCriteria.not_trashed)
+    files_in_query(q, &block)
+  end
+
+  def files_in_query(q)
+    files = []
+    page_token = nil
     begin
       result = @drive.list_files(
-        q: q.to_s, page_token: page_token, fields: default_fields
+        q: q.to_s, page_token: page_token, fields: search_fields
       )
       result.files.each do |file|
         yield file if block_given?
-        children << file
+        files << file
       end
       page_token = result.next_page_token
     end while page_token
-    children
+    files
   end
 
   def remove_root_parent_from_all_folders
@@ -157,17 +156,51 @@ class DriveClient
     end
   end
 
-  def search(q)
-    result = @drive.list_files(q: q.to_s, fields: default_fields)
+  def search(q, non_pagination_ack: false)
+    puts "THIS METHOD (DriveClient#search) DOES NOT HANDLE PAGINATION" unless non_pagination_ack
+    result = @drive.list_files(q: q.to_s, fields: search_fields)
     result.files
   end
 
-  def default_fields
-    'files(id,name,permissions,size,mimeType,shared,ownedByMe,modifiedTime),next_page_token'
+  # fields that can be included here _I think_ are documented here:
+  # https://developers.google.com/drive/v3/reference/files
+  def search_fields
+    "files(#{file_fields}),next_page_token"
+  end
+
+  def file_fields
+    'id,name,description,trashed,md5Checksum,permissions,size,mimeType,shared,ownedByMe,parents,modifiedTime,webViewLink'
   end
 
   def get_all_folders
     search FileCriteria.is_a_folder
+  end
+
+  def get_folder_by_id(id)
+    get_file_by_id(id)
+  end
+
+  def get_file_by_id(id)
+    @drive.get_file(id, fields: file_fields)
+  end
+
+  def get_folder_by_name_path(name_path)
+    if name_path == 'root' # special alias
+      found = self.root
+    else
+      folders = name_path.split('/')
+      parents = [nil]
+      folders.each do |f_name|
+        q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
+        q.and("name = '#{f_name}'")
+        parent = parents.shift
+        q.and(FileCriteria.has_parent(parent.id)) if parent
+        p "searching <#{q.to_s}>"
+        found = search(q, non_pagination_ack: true).first
+        parents << found
+      end
+    end
+    found
   end
 
   def email_address
@@ -191,7 +224,6 @@ class DriveClient
     end
     ((s > 9 || s.modulo(1) < 0.1 ? '%d' : '%.1f') % s) + ' ' + prefix[i]
   end
-
 end
 
 class DriveQuery
@@ -209,3 +241,6 @@ class DriveQuery
     @query
   end
 end
+
+# folder = get_folder_by_name_path('Pictures/2005/2005_christmas')
+# trashed_files = files_in_query(DriveQuery.new(FileCriteria.trashed).and(FileCriteria.has_parent(folder.id)))

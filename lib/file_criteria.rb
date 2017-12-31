@@ -23,4 +23,8 @@ class FileCriteria
   def self.trashed
     'trashed = true'
   end
+
+  def self.has_parent(parent_id)
+    "'#{parent_id}' in parents"
+  end
 end

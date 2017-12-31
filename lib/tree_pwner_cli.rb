@@ -1,4 +1,5 @@
 require_relative 'tree_pwner'
+require_relative 'trash_manager'
 
 class TreePwnerCli
   attr_reader :tp
@@ -6,11 +7,8 @@ class TreePwnerCli
   def initialize(*args)
     super
     @tp = TreePwner.new
-    # To get these, you have to download a client_secret.json from Dev Tools and
-    # all - see
-    # https://developers.google.com/drive/v3/web/quickstart/ruby#step_1_turn_on_the_api_name
-    @tp.connect_source('the.chrismo@gmail.com')
-    @tp.connect_target('chrismo@clabs.org')
+    @tp.connect_source('chrismo@clabs.org')
+    @tp.connect_target('the.chrismo@gmail.com')
   end
 
   def pretty_inspect
@@ -27,12 +25,20 @@ class TreePwnerCli
     client.nil? ? 'No client connected' : client.email_address
   end
 
-  def help
-    puts 'help                   -- Display this help'
-    puts 'connect_source [email] -- Connect source to email account'
-    puts 'connect_target [email] -- Connect target to email account'
-    puts 'open [folder name]     -- Show folders in [folder name]. Use "root" name to go back to the top.'
-    puts 'scan [folder name]     -- Scan folder name hierarchy for files to transfer ownership of.'
+  def commands
+    puts 'commands                                  -- Display this help'
+    puts 'open [folder name]                        -- Show folders in [folder name]. Use "root" name to go back to the top.'
+    puts '                                             Use forward slash to denote an arbitrary path of folders'
+    puts 'open_source_root                          -- Open source/target account root folder'
+    puts 'open_target_root'
+    puts 'open_source [folder]                      -- Open source/target account folder by name. If multiple '
+    puts 'open_target [folder]                         folders have same name, result is not deterministic.'
+    puts 'source_disk_usage                         -- Returns a FolderData root of all of the space used in the'
+    puts 'target_disk_usage                            source/target folder.'
+    puts 'make_target_owner_of_current_folder_files -- Self-explanatory.'
+    puts '--'
+    puts 'connect_source [email] -- Connect source to email account. Automatically done on initialize.'
+    puts 'connect_target [email] -- Connect target to email account. Automatically done on initialize.'
   end
 
   def connect_source(user_id)
@@ -65,14 +71,17 @@ class TreePwnerCli
     load_current_root_sub_folders(@tp.target_client)
   end
 
-  def source_disk_usage(folder_name=@current_root)
-    # folder = get_folder_obj(folder_name, @tp.source_client)
+  def source_disk_usage
     @tp.source_client.disk_usage(@current_folder)
   end
 
-  def target_disk_usage(folder_name=@current_root)
-    # folder = get_folder_obj(folder_name, @tp.target_client)
+  def target_disk_usage
     @tp.target_client.disk_usage(@current_folder)
+  end
+
+  # children_in_folder doesn't filter on owner, so either client will do
+  def current_folder_files
+    @tp.source_client.children_in_folder(@current_folder).map(&:name)
   end
 
   def make_target_owner_of_current_folder_files
@@ -83,13 +92,18 @@ class TreePwnerCli
   end
 
   def changed_mind_after_detected_trashed_files
-    trashed = @tp.source_client.search(FileCriteria.trashed)
+    trashed = @tp.source_client.search(FileCriteria.trashed, non_pagination_ack: true)
     if trashed.length > 0
       print "#{trashed.length} files in #{client_email(@tp.source_client)} Trash. Continue? (y/N): "
       !(gets.chomp =~ /y/)
     else
       false
     end
+  end
+
+  def verify_source_trash_found_in_target(safe_perma_delete: false)
+    TrashManager.new(@tp.source_client, @tp.target_client).
+      cleanup_trash_with_target_copy(safe_perma_delete: safe_perma_delete)
   end
 
   private
@@ -104,21 +118,6 @@ class TreePwnerCli
   end
 
   def get_folder_obj(folder_name, client=@tp.target_client)
-    if folder_name == 'root' # special alias
-      found = client.root
-    else
-      folders = folder_name.split('/')
-      parents = [nil]
-      folders.each do |f_name|
-        q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
-        q.and("name = '#{f_name}'")
-        parent = parents.shift
-        q.and("'#{parent.id}' in parents") if parent
-        p "searching <#{q.to_s}>"
-        found = client.search(q).first
-        parents << found
-      end
-    end
-    found
+    client.get_folder_by_name_path(folder_name)
   end
 end
