@@ -29,33 +29,17 @@ class TreePwner
   # source user, so it will be allowed - and also appear in the
   # source user's Trash folder, should we need to recover anything.
   def copy_and_replace_all_files_owned_by_source(folder)
-    # TODO: refactor to use traverse_folder
-    folders = [folder]
-
     pool = CopyReplaceJaerb.pool(args: self)
     puts "Created Celluloid pool with #{pool.size} workers"
     def pool.queue_size
       @async_proxy.mailbox.size
     end
 
-    while folder = folders.shift
-      print "Searching #{folder.name} ... "
-      q = DriveQuery.new(FileCriteria.is_not_a_folder).
-        and(FileCriteria.i_own)
-
-      # TODO: This process can hit the rate limit before the pool is even fully queued.
-      children_files = @source_client.children_in_folder(folder, q) do |file|
-        pool.async.copy_file_to_target_and_delete_original_in_source(file)
-      end
-      print "queued #{children_files.length} files. "
-
-      puts "Total queued: #{pool.queue_size}"
-
-      q = DriveQuery.new(FileCriteria.is_a_folder)
-      @source_client.children_in_folder(folder, q) do |child_folder|
-        folders << child_folder
-      end
+    traverse_folder(folder) do |file|
+      pool.async.copy_file_to_target_and_delete_original_in_source(file)
     end
+
+    puts "Total queued: #{pool.queue_size}"
 
     # block on this loop while we wait for all of the Celluloid jobs to finish
     while pool.queue_size > 0
@@ -63,15 +47,16 @@ class TreePwner
       sleep 10
     end
 
-    puts "All Done!"
+    puts "** Queue Empty! **"
 
     nil
   end
 
+  # TODO: This process can hit the rate limit before the pool is even fully queued.
   def traverse_folder(root_folder)
     folders = [root_folder]
     while folder = folders.shift
-      print "Searching #{folder.name} ... "
+      print "."
       q = DriveQuery.new(FileCriteria.is_not_a_folder).
         and(FileCriteria.i_own)
 
