@@ -7,8 +7,8 @@ class TreePwnerCli
   def initialize(*args)
     super
     @tp = TreePwner.new
-    @tp.connect_source('chrismo@clabs.org')
-    @tp.connect_target('the.chrismo@gmail.com')
+    @tp.connect_source('the.chrismo@gmail.com')
+    @tp.connect_target('chrismo@clabs.org')
   end
 
   # Pry 0.9
@@ -92,8 +92,10 @@ class TreePwnerCli
 
   def make_target_owner_of_current_folder_files
     if @tp.source_and_target_are_same_domain
+      puts "Same domain. Proceeding with simple owner transfer."
       @tp.transfer_ownership_all_files @current_folder
     else
+      puts "Different domains. Proceeding with copy/trash workaround transfer."
       unless changed_mind_after_detected_trashed_files
         @tp.copy_and_replace_all_files_owned_by_source @current_folder
       end

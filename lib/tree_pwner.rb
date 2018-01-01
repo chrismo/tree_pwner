@@ -43,6 +43,7 @@ class TreePwner
       q = DriveQuery.new(FileCriteria.is_not_a_folder).
         and(FileCriteria.i_own)
 
+      # TODO: This process can hit the rate limit before the pool is even fully queued.
       children_files = @source_client.children_in_folder(folder, q) do |file|
         pool.async.copy_file_to_target_and_delete_original_in_source(file)
       end
@@ -57,8 +58,8 @@ class TreePwner
     end
 
     # block on this loop while we wait for all of the Celluloid jobs to finish
-    while pool.size > 0
-      puts "Total queued: #{pool.queue_size}"
+    while pool.queue_size > 0
+      puts "** Total queued: #{pool.queue_size}"
       sleep 10
     end
 
