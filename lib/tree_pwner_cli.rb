@@ -19,7 +19,7 @@ class TreePwnerCli
       puts @current_root
       @sub_folders.sort { |a, b| a.name <=> b.name }.each { |f| puts "+- #{f.name}" }
     end
-    ['hello!', "Type help if you're lost"].sample
+    ['hello!', "Type `commands` for help"].sample
   end
 
   # Pry 0.10 eventually uses PP, and this is the PP way to provide custom output

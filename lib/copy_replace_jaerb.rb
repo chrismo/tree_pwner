@@ -1,21 +1,6 @@
-require 'celluloid/autostart'
-require 'retries'
+require_relative 'jaerb'
 
-class CopyReplaceJaerb
-  include Celluloid
-  include Celluloid::Logger
-
-  def initialize(pwner)
-    @pwner = pwner
-  end
-
-  def retry_options
-    {:max_tries => 10,
-     :base_sleep_seconds => 2.0,
-     :max_sleep_seconds => 30.0,
-     :rescue => [Google::Apis::RateLimitError]}
-  end
-
+class CopyReplaceJaerb < Jaerb
   def copy_file_to_target_and_delete_original_in_source(origin_file)
     new_file = nil
 
@@ -36,8 +21,4 @@ class CopyReplaceJaerb
     end
   end
 
-  def log_put(msg, level = :info)
-    self.send(level, msg)
-    puts msg
-  end
 end
