@@ -8,7 +8,7 @@ require_relative 'file_criteria'
 class DriveClient
   OOB_URI = 'urn:ietf:wg:oauth:2.0:oob'
 
-  def self.connect(_, user_id)
+  def self.connect(_, user_id, logger: nil)
     tmp_dir = File.expand_path('../tmp', __dir__)
     credentials_file = File.join(tmp_dir, "client_secret.#{user_id}.json")
     client_id = ::Google::Auth::ClientId.from_file(credentials_file)
@@ -29,20 +29,42 @@ class DriveClient
     drive.client_options.application_name = 'TreePwner'
     drive.authorization = credentials
 
-    self.new(drive, user_id)
+    self.new(drive, user_id, logger: logger)
   end
 
   attr_reader :root
 
-  def initialize(drive, user_id)
+  def initialize(drive, user_id, logger: nil)
     @drive = drive
     @root = @drive.get_file('root')
     @user_id = user_id
+    @logger = logger || NullLogger.new
+  end
+
+  def retry_options
+    {:max_tries => 10,
+     :base_sleep_seconds => 2.0,
+     :max_sleep_seconds => 30.0,
+     :rescue => [Google::Apis::RateLimitError]}
+  end
+
+  def with_rate_limiting
+    with_retries(retry_options) do |attempt_number|
+      log_put("Re-try #{attempt_number}", :warn) if attempt_number > 1
+      yield
+    end
+  end
+
+  def log_put(msg, level = :info)
+    @logger.send(level, msg)
+    puts msg
   end
 
   def copy_file(src_file)
-    file = Google::Apis::DriveV3::File.new(modified_time: src_file.modified_time.rfc3339)
-    @drive.copy_file(src_file.id, file)
+    with_rate_limiting do
+      file = Google::Apis::DriveV3::File.new(modified_time: src_file.modified_time.rfc3339)
+      @drive.copy_file(src_file.id, file)
+    end
   end
 
   def trash_file(file)
@@ -54,14 +76,18 @@ class DriveClient
   end
 
   def change_trashed_status(file, trashed:)
-    params = Google::Apis::DriveV3::File.new(trashed: trashed)
-    @drive.update_file(file.id, params)
+    with_rate_limiting do
+      params = Google::Apis::DriveV3::File.new(trashed: trashed)
+      @drive.update_file(file.id, params)
+    end
   end
 
   # permanently deletes file only if trashed
   def permanently_delete_trashed_file(file)
     raise "File not trashed, will not delete." unless file.trashed
-    @drive.delete_file(file.id)
+    with_rate_limiting do
+      @drive.delete_file(file.id)
+    end
   end
 
   # This errors when trying it between domains:
@@ -83,26 +109,8 @@ class DriveClient
     new_perm = Google::Apis::DriveV3::Permission.new(id: recipient_permission.id,
                                                      role: 'owner')
 
-    @drive.update_permission(file.id, recipient_permission.id, new_perm, transfer_ownership: true)
-  end
-
-  # limited to folders and Google Docs - excludes uploaded files
-  def give_file_ownership_to_email(file_id, email)
-    raise 'not v3 compatible'
-    hash = {
-      'value' => email,
-      'type' => 'user',
-      'role' => 'owner'
-    }
-    new_permission = @drive.permissions.insert.request_schema.new(hash)
-    result = @client.execute(
-      :api_method => @drive.permissions.insert,
-      :body_object => new_permission,
-      :parameters => {'fileId' => file_id})
-    if result.status == 200
-      result.data
-    else
-      puts "An error occurred: #{result.data['error']['message']}"
+    with_rate_limiting do
+      @drive.update_permission(file.id, recipient_permission.id, new_perm, transfer_ownership: true)
     end
   end
 
@@ -115,14 +123,16 @@ class DriveClient
     files = []
     page_token = nil
     begin
-      result = @drive.list_files(
-        q: q.to_s, page_token: page_token, fields: search_fields, order_by: 'name_natural'
-      )
-      result.files.each do |file|
-        yield file if block_given?
-        files << file
+      with_rate_limiting do
+        result = @drive.list_files(
+          q: q.to_s, page_token: page_token, fields: search_fields, order_by: 'name_natural'
+        )
+        result.files.each do |file|
+          yield file if block_given?
+          files << file
+        end
+        page_token = result.next_page_token
       end
-      page_token = result.next_page_token
     end while page_token
     files
   end
@@ -134,6 +144,7 @@ class DriveClient
   end
 
   def remove_root_parent_if_other_parent_exists(folder)
+    raise "Dunno if v3 compatible"
     if folder.parents.map(&:isRoot).include?(true) && folder.parents.length > 1
       root_parent = folder.parents.detect { |f| f.isRoot }
       result = @client.execute(
@@ -152,8 +163,10 @@ class DriveClient
 
   def search(q, non_pagination_ack: false)
     puts "THIS METHOD (DriveClient#search) DOES NOT HANDLE PAGINATION" unless non_pagination_ack
-    result = @drive.list_files(q: q.to_s, fields: search_fields)
-    result.files
+    with_rate_limiting do
+      result = @drive.list_files(q: q.to_s, fields: search_fields)
+      result.files
+    end
   end
 
   # fields that can be included here _I think_ are documented here:
@@ -175,7 +188,9 @@ class DriveClient
   end
 
   def get_file_by_id(id)
-    @drive.get_file(id, fields: file_fields)
+    with_rate_limiting do
+      @drive.get_file(id, fields: file_fields)
+    end
   end
 
   def get_folder_by_name_path(name_path)
@@ -185,8 +200,9 @@ class DriveClient
       folders = name_path.split('/')
       parents = [nil]
       folders.each do |f_name|
-        q = DriveQuery.new(FileCriteria.is_a_folder).and(FileCriteria.not_trashed)
-        q.and(FileCriteria.name_is(f_name))
+        q = DriveQuery.new(FileCriteria.is_a_folder).
+          and(FileCriteria.not_trashed).
+          and(FileCriteria.name_is(f_name))
         parent = parents.shift
         q.and(FileCriteria.has_parent(parent.id)) if parent
         p "searching <#{q.to_s}>"
@@ -237,5 +253,13 @@ class DriveQuery
 
   def to_s
     @query
+  end
+end
+
+class NullLogger < Logger
+  def initialize(*args)
+  end
+
+  def add(*args, &block)
   end
 end

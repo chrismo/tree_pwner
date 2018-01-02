@@ -6,17 +6,18 @@ class TreePwner
   attr_reader :source_client, :target_client
 
   def initialize
-    Celluloid.logger = LogFactory.make_log('tree-pwner')
+    @logger = LogFactory.make_log('tree-pwner')
+    Celluloid.logger = @logger
   end
 
   def connect_source(user_id)
     puts "Connecting to Google Drive source #{user_id}..."
-    @source_client = DriveClient.connect('source', user_id)
+    @source_client = DriveClient.connect('source', user_id, logger: @logger)
   end
 
   def connect_target(user_id)
     puts "Connecting to Google Drive target #{user_id}..."
-    @target_client = DriveClient.connect('target', user_id)
+    @target_client = DriveClient.connect('target', user_id, logger: @logger)
   end
 
   # In the Web UI, Google Drive _will_ allow a non-owning editor
