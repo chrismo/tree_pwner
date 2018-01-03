@@ -10,13 +10,6 @@ class Jaerb
     @pwner = pwner
   end
 
-  def retry_options
-    {:max_tries => 10,
-     :base_sleep_seconds => 2.0,
-     :max_sleep_seconds => 30.0,
-     :rescue => [Google::Apis::RateLimitError]}
-  end
-
   def log_put(msg, level = :info)
     self.send(level, msg)
     puts msg

@@ -1,13 +1,13 @@
 require_relative 'copy_replace_jaerb'
 require_relative 'drive_client'
 require_relative 'log_factory'
+require_relative 'safe_trash_jaerb'
 
 class TreePwner
   attr_reader :source_client, :target_client
 
   def initialize
     @logger = LogFactory.make_log('tree-pwner')
-    Celluloid.logger = @logger
   end
 
   def connect_source(user_id)
@@ -23,6 +23,7 @@ class TreePwner
   # In the Web UI, Google Drive _will_ allow a non-owning editor
   # to trash a file, though it appears this file will be orphaned
   # at that point, appearing in neither user's Trash folder.
+  # (this is old info ^^^)
   #
   # In the API, Google Drive _will not_ allow a non-owning editor
   # to trash a file. So, we must copy it as the 'target' user
@@ -30,27 +31,37 @@ class TreePwner
   # source user, so it will be allowed - and also appear in the
   # source user's Trash folder, should we need to recover anything.
   def copy_and_replace_all_files_owned_by_source(folder)
-    pool = CopyReplaceJaerb.pool(args: self)
+    Celluloid.logger = @logger
+    pool_it(CopyReplaceJaerb.pool(args: self)) do |pool|
+      traverse_folder(folder) do |file|
+        pool.async.copy_file_to_target_and_delete_original_in_source(file)
+      end
+    end
+  end
+
+  def cleanup_source_trash_found_in_target(safe_perma_delete: false)
+    Celluloid.logger = LogFactory.make_log('tree-pwner-trash')
+    pool_it(SafeTrashJaerb.pool(args: [@source_client, @target_client, safe_perma_delete])) do |pool|
+      @source_client.files_in_query(DriveQuery.new(FileCriteria.trashed)) do |trashed|
+        pool.async.trash_source_file_if_target_exists(trashed)
+      end
+    end
+  end
+
+  def pool_it(pool)
     puts "Created Celluloid pool with #{pool.size} workers"
     def pool.queue_size
       @async_proxy.mailbox.size
     end
 
-    traverse_folder(folder) do |file|
-      pool.async.copy_file_to_target_and_delete_original_in_source(file)
-    end
+    yield pool
 
-    puts "Total queued: #{pool.queue_size}"
-
-    # block on this loop while we wait for all of the Celluloid jobs to finish
     while pool.queue_size > 0
       puts "** Total queued: #{pool.queue_size}"
       sleep 10
     end
 
     puts "** Queue Empty! **"
-
-    nil
   end
 
   # TODO: This process can hit the rate limit before the pool is even fully queued.

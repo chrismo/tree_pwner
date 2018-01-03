@@ -1,5 +1,4 @@
 require_relative 'tree_pwner'
-require_relative 'trash_manager'
 
 class TreePwnerCli
   attr_reader :tp
@@ -96,12 +95,19 @@ class TreePwnerCli
       @tp.transfer_ownership_all_files @current_folder
     else
       puts "Different domains. Proceeding with copy/trash workaround transfer."
-      unless changed_mind_after_detected_trashed_files
+      # unless changed_mind_after_detected_trashed_files
         @tp.copy_and_replace_all_files_owned_by_source @current_folder
-      end
+      # end
     end
     self
   end
+
+  def cleanup_source_trash_found_in_target(safe_perma_delete: false)
+    @tp.cleanup_source_trash_found_in_target(safe_perma_delete: safe_perma_delete)
+    self
+  end
+
+  private
 
   def changed_mind_after_detected_trashed_files
     trashed = @tp.source_client.search(FileCriteria.trashed, non_pagination_ack: true)
@@ -112,13 +118,6 @@ class TreePwnerCli
       false
     end
   end
-
-  def cleanup_source_trash_found_in_target(safe_perma_delete: false)
-    TrashManager.new(@tp.source_client, @tp.target_client).
-      cleanup_trash_with_target_copy(safe_perma_delete: safe_perma_delete)
-  end
-
-  private
 
   def load_current_root_sub_folders(client=@tp.target_client)
     @sub_folders = []
