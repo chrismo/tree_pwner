@@ -3,11 +3,10 @@ require_relative 'tree_pwner'
 class TreePwnerCli
   attr_reader :tp
 
-  def initialize(*args)
-    super
+  def initialize(source_email, target_email)
     @tp = TreePwner.new
-    @tp.connect_source('the.chrismo@gmail.com')
-    @tp.connect_target('chrismo@clabs.org')
+    @tp.connect_source(source_email)
+    @tp.connect_target(target_email)
   end
 
   # Pry 0.9
