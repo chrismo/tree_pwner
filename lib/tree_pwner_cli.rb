@@ -89,7 +89,7 @@ class TreePwnerCli
   end
 
   def make_target_owner_of_current_folder_files
-    if @tp.source_and_target_in_same_custom_domain
+    if @tp.source_and_target_in_same_custom_domain?
       puts "Same domain. Proceeding with simple owner transfer."
       @tp.transfer_ownership_all_files @current_folder
     else

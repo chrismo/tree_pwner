@@ -8,14 +8,47 @@ require_relative 'jaerb'
 #
 # TODO: Rename
 class CopyReplaceJaerb < Jaerb
-  def copy_file_to_target_and_delete_original_in_source(origin_file)
-    @pwner.target_client.copy_file(origin_file)
-    @pwner.source_client.trash_file(origin_file)
-    log_put("#{origin_file.name} copied.")
+  def transfer_file_to_target(source_file)
+    if is_google_doc_in_same_domain?(source_file)
+      transfer_ownership_to_target(source_file)
+    else
+      copy_file_to_target_and_delete_original_in_source(source_file)
+    end
   end
 
-  def transfer_ownership_to_target(file)
-    @pwner.source_client.transfer_ownership_to(file, @pwner.target_client.email_address)
-    log_put("#{file.name} ownership transferred.")
+  def copy_file_to_target_and_delete_original_in_source(source_file)
+    if is_google_doc?(source_file)
+      new_file = @pwner.target_client.copy_file(source_file)
+      @pwner.source_client.trash_file(source_file)
+      @pwner.target_client.rename_file(new_file, new_file.name.sub(/^Copy of /, ''))
+      log_put("#{source_file.name} copied.")
+    else
+      @pwner.target_client.copy_file(source_file)
+      @pwner.source_client.trash_file(source_file)
+      log_put("#{source_file.name} copied.")
+    end
+  rescue => e
+    log_put("#{source_file.name}: #{e.message}")
+  end
+
+  def transfer_ownership_to_target(source_file)
+    @pwner.source_client.transfer_ownership_to(source_file, @pwner.target_client.email_address)
+    log_put("#{source_file.name} ownership transferred.")
+  rescue => e
+    log_put("#{source_file.name}: #{e.message}")
+  end
+
+  private
+
+  def is_google_doc_in_same_domain?(source_file)
+    is_google_doc?(source_file) && can_transfer_ownership?
+  end
+
+  def is_google_doc?(source_file)
+    source_file.mime_type =~ /^application\/vnd.google-apps/
+  end
+
+  def can_transfer_ownership?
+    @pwner.source_and_target_in_same_domain?
   end
 end

@@ -34,11 +34,7 @@ class TreePwner
     Celluloid.logger = @logger
     pool_it(CopyReplaceJaerb.pool(args: self)) do |pool|
       traverse_folder(folder) do |file|
-        if file.mime_type =~ /^application\/vnd.google-apps/
-          pool.async.transfer_ownership_to_target(file)
-        else
-          pool.async.copy_file_to_target_and_delete_original_in_source(file)
-        end
+        pool.async.transfer_file_to_target(file)
       end
     end
   end
@@ -105,8 +101,12 @@ class TreePwner
     @source_client.transfer_ownership_to(file, @target_client.email_address)
   end
 
-  def source_and_target_in_same_custom_domain
-    (@source_client.email_domain == @target_client.email_domain) &&
+  def source_and_target_in_same_custom_domain?
+    source_and_target_in_same_domain? &&
       @source_client.email_domain != 'gmail.com'
+  end
+
+  def source_and_target_in_same_domain?
+    @source_client.email_domain == @target_client.email_domain
   end
 end

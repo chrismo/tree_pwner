@@ -67,6 +67,13 @@ class DriveClient
     end
   end
 
+  def rename_file(file, new_name)
+    with_rate_limiting do
+      new_file = Google::Apis::DriveV3::File.new(name: new_name)
+      @drive.update_file(file.id, new_file)
+    end
+  end
+
   def trash_file(file)
     change_trashed_status(file, trashed: true)
   end
@@ -90,18 +97,28 @@ class DriveClient
     end
   end
 
-  # This errors when trying it between domains:
+  # This the error between gmail and custom domain:
   # - invalidSharingRequest: Bad Request. User message: "ACL change not allowed"
   #
   # In Dec 2016, this didn't work, even in same domain.
-  # When I tried again Dec 2017 it did!
+  #
+  # When I tried again Dec 2017 it did ... sorta.
+  # - If both accounts are in the same custom domain, then it just works for all files and Google Docs.
+  # - If both accounts are gmail accounts, then this works for Google Docs, but not regular files.
+  # - If one is gmail, one is custom domain, then this doesn't work for any file or Google Doc.
+  #
+  #   This doesn't work in the UI either, same error message.
+  #
+  #   Code below updates the permission. If you try to create a new permission, it fails with a more
+  #   verbose error message saying something like the email address of the target isn't in the same
+  #   domain.
   def transfer_ownership_to(file, email)
     recipient_permission = file.permissions.detect { |p| p.email_address == email }
 
     # code isn't designed to ADD a permission for this new user.
     raise "Cannot find <#{email}> in current users on file" unless recipient_permission
 
-    # This next line doesn't work - "The resource body includes fields which are not directly writable"
+    # The permission's role can't be edited - "The resource body includes fields which are not directly writable"
     # => `recipient_permission.role = 'owner'`
     # So - have to create a new permission instance and just set the one field.
     new_perm = Google::Apis::DriveV3::Permission.new(id: recipient_permission.id,
