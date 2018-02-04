@@ -17,7 +17,7 @@ class CopyReplaceJaerb < Jaerb
   end
 
   def copy_file_to_target_and_delete_original_in_source(source_file)
-    if is_google_doc?(source_file)
+    if source_file.is_google_doc?
       new_file = @pwner.target_client.copy_file(source_file)
       @pwner.source_client.trash_file(source_file)
       @pwner.target_client.rename_file(new_file, new_file.name.sub(/^Copy of /, ''))
@@ -41,11 +41,7 @@ class CopyReplaceJaerb < Jaerb
   private
 
   def is_google_doc_in_same_domain?(source_file)
-    is_google_doc?(source_file) && can_transfer_ownership?
-  end
-
-  def is_google_doc?(source_file)
-    source_file.mime_type =~ /^application\/vnd.google-apps/
+    source_file.is_google_doc? && can_transfer_ownership?
   end
 
   def can_transfer_ownership?

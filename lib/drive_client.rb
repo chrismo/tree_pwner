@@ -278,3 +278,9 @@ class NullLogger < Logger
   def add(*args, &block)
   end
 end
+
+class Google::Apis::DriveV3::File
+  def is_google_doc?
+    mime_type =~ /^application\/vnd.google-apps/
+  end
+end
