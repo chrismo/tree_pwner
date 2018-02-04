@@ -2,12 +2,19 @@ require_relative '../lib/tree_pwner_cli'
 
 class IntegrationTest
   def initialize
-    @tpc = TreePwnerCli.new('clabs.alpha@gmail.com', 'clabs.bravo@gmail.com')
+    # @tpc = TreePwnerCli.new('clabs.alpha@gmail.com', 'clabs.bravo@gmail.com')
+    @tpc = TreePwnerCli.new('clabs.bravo@gmail.com', 'clabs.alpha@gmail.com')
     run_tests
   end
 
-  def test_google_doc
-    puts "test"
+  def test_google_doc_owner_transfer
+    @tpc.open_source('test')
+    @tpc.make_target_owner_of_current_folder_files
+    puts @tpc.pretty_inspect
+  end
+
+  def test_cleanup_trash
+    @tpc.cleanup_source_trash_found_in_target(safe_perma_delete: true)
   end
 
   private

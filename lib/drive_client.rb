@@ -93,10 +93,8 @@ class DriveClient
   # This errors when trying it between domains:
   # - invalidSharingRequest: Bad Request. User message: "ACL change not allowed"
   #
-  # This errors when trying it within the same domain, somesuch user didn't have rights
-  # to do it - which makes no sense to me. But, my guess is this feature is only
-  # supported for transfer within domain users, and some indications on the web
-  # agree with that. Sad face.
+  # In Dec 2016, this didn't work, even in same domain.
+  # When I tried again Dec 2017 it did!
   def transfer_ownership_to(file, email)
     recipient_permission = file.permissions.detect { |p| p.email_address == email }
 
