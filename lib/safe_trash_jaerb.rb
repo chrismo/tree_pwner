@@ -54,7 +54,17 @@ class SafeTrashJaerb < Jaerb
     def trashed_matches?(found)
       found.map do |found_file|
         if trashed.is_google_doc?
-          raise "Cannot compare Google Docs"
+          if trashed.name != found_file.name
+            # this should be impossible, since we only find the match based
+            # on name. But, better to double-check than have no code here.
+            #
+            # TODO: could use the export to export it to a .txt format and
+            # TODO: \ try to compare the contents that way.
+            log_put("Trashed name doesn't match.")
+            false
+          else
+            true
+          end
         elsif trashed.md5_checksum.nil? || found_file.md5_checksum.nil?
           log_put("One or other file has no MD5. <#{trashed.name}>", :error)
           false

@@ -37,7 +37,7 @@ class FolderData
     end
   end
 
-  # TODO - rename and add sorting options (default to size desc)
+  # TODO: rename and add sorting options (default to size desc)
   def dump(indent: 0, depth: 0, current_depth: 0)
     rock_bottom = (depth == current_depth)
     display_size = rock_bottom ? recursive_size : size
